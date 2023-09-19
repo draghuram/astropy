@@ -1,7 +1,6 @@
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
 
 
-import os
 import re
 import warnings
 from copy import deepcopy
@@ -14,7 +13,6 @@ from astropy.table import Column, MaskedColumn, Table, meta, serialize
 from astropy.time import Time
 from astropy.utils.data_info import serialize_context_as
 from astropy.utils.exceptions import AstropyDeprecationWarning, AstropyUserWarning
-from astropy.utils.misc import NOT_OVERWRITING_MSG
 
 from . import BinTableHDU, GroupsHDU, HDUList, TableHDU
 from . import append as fits_append
@@ -435,17 +433,17 @@ def write_table_fits(input, output, overwrite=False, append=False):
     table_hdu = table_to_hdu(input, character_as_bytes=True)
 
     # Check if output file already exists
-    if isinstance(output, str) and os.path.exists(output):
-        if overwrite:
-            os.remove(output)
-        elif not append:
-            raise OSError(NOT_OVERWRITING_MSG.format(output))
+    # if isinstance(output, str) and os.path.exists(output):
+    #     if overwrite:
+    #         os.remove(output)
+    #     elif not append:
+    #         raise OSError(NOT_OVERWRITING_MSG.format(output))
 
     if append:
         # verify=False stops it reading and checking the existing file.
         fits_append(output, table_hdu.data, table_hdu.header, verify=False)
     else:
-        table_hdu.writeto(output)
+        table_hdu.writeto(output, overwrite=overwrite)
 
 
 io_registry.register_reader("fits", Table, read_table_fits)
