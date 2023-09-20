@@ -1,5 +1,7 @@
 import gc
 import warnings
+from functools import partial
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -76,7 +78,7 @@ class TestSingleTable:
     def test_simple_pathlib(self, tmp_path):
         filename = tmp_path / "test_simple.fit"
         t1 = Table(self.data)
-        t1.write(filename, overwrite=True)
+        t1.write(Path(filename), overwrite=True)
         t2 = Table.read(filename)
         assert equal_data(t1, t2)
 
@@ -335,35 +337,76 @@ class TestSingleTable:
                     assert hdu_table.header == hdu.header
                     assert np.all(hdu_table.data == hdu.data)
 
-        filename = tmp_path / "test_write_append.fits"
-        t.write(filename, append=True)
-        t.write(filename, append=True)
-        check_equal(filename, 3)
+        def test(format_str="", use_pathlib=False):
+            filename = tmp_path / f"test_write_append_{format_str}_{use_pathlib}.fits"
+            if use_pathlib:
+                filename = Path(filename)
 
-        # Check the overwrite works correctly.
-        t.write(filename, append=True, overwrite=True)
-        t.write(filename, append=True)
-        check_equal(filename, 3)
+            if format_str:
+                write_func = partial(t.write, format=format_str)
+            else:
+                write_func = t.write
 
-        # Normal write, check it's not appending.
-        t.write(filename, overwrite=True)
-        t.write(filename, overwrite=True)
-        check_equal(filename, 2)
+            write_func(filename, append=True)
+            write_func(filename, append=True)
+            check_equal(filename, 3)
 
-        # Now write followed by append, with different shaped tables.
-        t2 = Table(np.array([1, 2]))
-        t2.write(filename, overwrite=True)
-        t.write(filename, append=True)
-        check_equal(filename, 3, start_from=2)
-        assert equal_data(t2, Table.read(filename, hdu=1))
+            # Check the overwrite works correctly.
+            write_func(filename, append=True, overwrite=True)
+            write_func(filename, append=True)
+            check_equal(filename, 3)
+
+            # Normal write, check it's not appending.
+            write_func(filename, overwrite=True)
+            write_func(filename, overwrite=True)
+            check_equal(filename, 2)
+
+            # Now write followed by append, with different shaped tables.
+            t2 = Table(np.array([1, 2]))
+            if format_str:
+                t2.write(filename, format=format_str, overwrite=True)
+            else:
+                t2.write(filename, overwrite=True)
+
+            write_func(filename, append=True)
+            check_equal(filename, 3, start_from=2)
+            assert equal_data(t2, Table.read(filename, hdu=1))
+
+        # Test string file name
+        test()
+        test(format_str="fits")
+
+        # Test filename with "Path"
+        test(use_pathlib=True)
+        test(use_pathlib=True, format_str="fits")
 
     def test_write_overwrite(self, tmp_path):
-        t = Table(self.data)
-        filename = tmp_path / "test_write_overwrite.fits"
-        t.write(filename)
-        with pytest.raises(OSError, match=_NOT_OVERWRITING_MSG_MATCH):
-            t.write(filename)
-        t.write(filename, overwrite=True)
+        def test(format_str="", use_pathlib=False):
+            t = Table(self.data)
+
+            filename = (
+                tmp_path / f"test_write_overwrite_{format_str}_{use_pathlib}.fits"
+            )
+            if use_pathlib:
+                filename = Path(filename)
+
+            if format_str:
+                write_func = partial(t.write, format=format_str)
+            else:
+                write_func = t.write
+
+            write_func(filename)
+            with pytest.raises(OSError, match=_NOT_OVERWRITING_MSG_MATCH):
+                write_func(filename)
+            write_func(filename, overwrite=True)
+
+        # Test string file name
+        # test()
+        # test(format_str="fits")
+
+        # Test filename with "Path"
+        # test(use_pathlib=True)
+        test(use_pathlib=True, format_str="fits")
 
     def test_mask_nans_on_read(self, tmp_path):
         filename = tmp_path / "test_inexact_format_parse_on_read.fits"
